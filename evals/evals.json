@@ -1,0 +1,23 @@
+{
+  "skill_name": "video-speech-extractor",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我提取这个视频的字幕：https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "expected_output": "下载视频字幕并转换为 Markdown 格式的讲稿文档",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Extract the transcript from this video and translate to Chinese: https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "expected_output": "提取英文字幕，同时提供原文和中文翻译的 Markdown 文档",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "把这个B站视频转成文字：https://www.bilibili.com/video/BV1xx411c7mD",
+      "expected_output": "下载B站视频字幕并输出为 Markdown 讲稿",
+      "files": []
+    }
+  ]
+}
