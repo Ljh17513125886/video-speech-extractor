@@ -1,122 +1,120 @@
 ---
 name: video-speech-extractor
 description: |
-  从视频 URL 提取语音文字/字幕，输出为 Markdown 讲稿文档。
-
-  支持场景：
-  - 用户给视频链接，想要获取文字版讲稿/字幕
-  - 外语视频需要翻译成中文
-  - 支持中英日韩等主流语言
-
-  触发短语："提取视频字幕"、"视频转文字"、"get transcript from video"、"把视频转成文字"、"帮我提取这个视频的内容"、"视频讲稿"、"字幕提取"。
-
-  支持平台：YouTube、Bilibili、Twitter/X、TikTok、Vimeo 等 1800+ 视频平台。
+  Extract subtitles or speech transcripts from video URLs and produce Markdown transcript documents. Use when a user asks to turn a video into text, fetch subtitles, summarize spoken content from a URL, or generate a Chinese bilingual transcript from YouTube, Bilibili, Vimeo, TikTok, X/Twitter, and similar platforms. Prefer direct subtitle download with yt-dlp; if the extracted transcript is not Chinese, automatically translate it to Chinese in interleaved original-plus-Chinese paragraphs. If YouTube blocks anonymous access, retry with browser cookies such as `--cookies-from-browser chrome`.
 ---
 
 # Video Speech Extractor
 
-从视频链接提取语音文字，生成 Markdown 格式的讲稿文档。
+Extract transcript text from a video URL and save Markdown output.
 
-## 工作流程
+## Use the scripted workflow
 
-### 1. 分析视频链接
-
-首先确认视频平台和可用的字幕/转录选项：
+1. Inspect available subtitles first.
 
 ```bash
-# 查看可用的字幕列表
-yt-dlp --list-subs "<video_url>"
+python3 scripts/extract_subtitles.py --list "<video_url>"
 ```
 
-### 2. 获取讲稿内容
-
-**优先级策略：**
-
-1. **优先下载现成字幕**（质量最高）
-   - 手动上传的字幕 > 自动生成的字幕
-   - 原语言字幕 > 翻译字幕
-
-2. **无字幕时提取音频转录**（备选方案）
-   - 使用 whisper 或类似工具
-
-### 3. 下载字幕命令
+2. If YouTube blocks anonymous access, retry with a logged-in browser session.
 
 ```bash
-# 下载所有可用字幕
-yt-dlp --write-subs --write-auto-subs --skip-download --sub-lang all -o "%(title)s" "<video_url>"
-
-# 下载特定语言字幕（如中文）
-yt-dlp --write-subs --skip-download --sub-lang zh-Hans -o "%(title)s" "<video_url>"
-
-# 下载英文字幕
-yt-dlp --write-subs --write-auto-subs --skip-download --sub-lang en -o "%(title)s" "<video_url>"
+python3 scripts/extract_subtitles.py --cookies-from-browser chrome --list "<video_url>"
 ```
 
-### 4. 字幕格式转换
-
-下载的字幕通常是 `.vtt` 或 `.srt` 格式，需要转换为纯文本：
+3. Download the best subtitle track and generate Markdown.
 
 ```bash
-# 清理时间戳，提取纯文本
-sed 's/<[^>]*>//g' input.vtt | sed '/^[0-9]/d' | sed '/^$/d' > output.txt
+python3 scripts/extract_subtitles.py "<video_url>"
 ```
 
-### 5. 翻译处理
+4. Pin a preferred subtitle language when the user asks for one.
 
-**如果是外语视频：**
+```bash
+python3 scripts/extract_subtitles.py --language en "<video_url>"
+python3 scripts/extract_subtitles.py --language zh-Hans --cookies-from-browser chrome "<video_url>"
+```
 
-1. 保留原语言讲稿
-2. 使用 LLM 翻译成中文
-3. 两个版本都输出到 Markdown
+## Follow the extraction order
 
-## 输出格式
+1. Detect the platform and try direct subtitles first.
+2. Prefer manual subtitles over automatic subtitles.
+3. Prefer the requested language when available.
+4. Otherwise fall back to the best available language using the built-in priority.
+5. Convert the subtitle file to clean text.
+6. Save the original-language transcript as Markdown.
 
-生成的 Markdown 文件结构：
+## Handle YouTube auth failures explicitly
+
+Treat `Sign in to confirm you’re not a bot` as a standard failure mode.
+
+- Retry with `--cookies-from-browser chrome` first.
+- Retry with `--cookies <cookies.txt>` when browser cookies are unavailable.
+- Do not pretend extraction succeeded when yt-dlp cannot access the video.
+
+## Translate non-Chinese transcripts to Chinese by default
+
+If the extracted transcript language is not Chinese:
+
+1. Keep the original transcript file intact.
+2. Translate the transcript to Chinese with the active Codex model in the current session.
+3. Save a bilingual Markdown file named `{title}_transcript_bilingual.md`.
+4. Format the bilingual file as interleaved paragraphs: one original paragraph, then one Chinese paragraph.
+
+Do not call an external translation API unless the user explicitly asks for one. The default translation path is the current model that is already executing the skill.
+
+If the extracted transcript is already Chinese, do not generate a Chinese translation copy unless the user asks for another target language or another format.
+
+## Output contract
+
+- Original transcript: `{title}_transcript.md`
+- Bilingual transcript: `{title}_transcript_bilingual.md`
+- Raw subtitle file: keep the downloaded `.vtt`, `.srt`, `.ass`, or `.ssa` file next to the Markdown output
+
+Use this Markdown shape for the original transcript:
 
 ```markdown
-# [视频标题]
+# [Video Title]
 
-> 来源：[视频链接]
-> 时长：[视频时长]
-> 提取时间：[日期]
+> Source: [video URL]
+> Duration: [HH:MM:SS]
+> Subtitle language: [language code]
+> Subtitle source: [manual|automatic]
+> Extracted at: [timestamp]
 
-## 讲稿内容
+## Transcript
 
-[原语言讲稿内容]
-
----
-
-## 中文翻译
-
-[中文翻译内容，仅外语视频需要]
+[clean transcript text]
 ```
 
-## 文件命名
+Use this Markdown shape for a non-Chinese bilingual transcript:
 
-- 原语言版：`{视频标题}_transcript.md`
-- 双语版：`{视频标题}_transcript_bilingual.md`
+```markdown
+# [Video Title]
 
-## 错误处理
+> Source: [video URL]
+> Duration: [HH:MM:SS]
+> Subtitle language: [language code]
+> Subtitle source: [manual|automatic]
+> Extracted at: [timestamp]
 
-| 情况 | 处理方式 |
-|------|----------|
-| 视频不可访问 | 提示用户检查链接或网络 |
-| 无字幕可用 | 询问是否需要音频转录（需要额外工具） |
-| 字幕语言不匹配 | 下载最接近的语言，说明情况 |
+## Bilingual Transcript
 
-## 依赖
+[original paragraph 1]
 
-- `yt-dlp`：视频下载和字幕提取
-- `ffmpeg`（可选）：音频提取
-- `whisper`（可选）：无字幕时的语音识别
+[中文翻译段落 1]
 
-## 示例用法
+[original paragraph 2]
 
-用户输入：
-> 帮我提取这个视频的字幕：https://www.youtube.com/watch?v=xxxxx
+[中文翻译段落 2]
+```
 
-用户输入：
-> 这个 B站视频讲的是什么？把内容转成文字给我
+## Use the text-cleaning helper when needed
 
-用户输入：
-> Extract the transcript from this video: https://vimeo.com/xxxxx
+If a subtitle file already exists, convert it directly:
+
+```bash
+python3 scripts/subtitle_to_text.py --input "<subtitle_file>"
+```
+
+Use the helper for `.vtt`, `.srt`, `.ass`, and `.ssa`.

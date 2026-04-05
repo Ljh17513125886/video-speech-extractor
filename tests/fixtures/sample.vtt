@@ -1,0 +1,13 @@
+WEBVTT
+
+Kind: captions
+Language: en
+
+NOTE intro note
+skip this block
+
+00:00:00.000 --> 00:00:01.500 align:start position:0%
+<v Speaker> Hello <b>world</b>
+
+00:00:01.500 --> 00:00:03.000
+Second line

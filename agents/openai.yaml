@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Speech Extractor"
+  short_description: "Extract video subtitles and transcripts"
+  default_prompt: "Use $video-speech-extractor to extract subtitles from this video URL, and if the transcript is not Chinese, produce an interleaved original-plus-Chinese Markdown transcript."

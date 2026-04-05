@@ -1,113 +1,86 @@
 # Video Speech Extractor
 
-从视频链接提取语音文字/字幕，生成 Markdown 格式的讲稿文档。
+Extract subtitles from video URLs with `yt-dlp`, clean them into transcript text, and write Markdown transcript files.
 
-## 功能特点
+## What this repo provides
 
-- 支持 1800+ 视频平台（YouTube、Bilibili、Twitter/X、TikTok、Vimeo 等）
-- 自动选择最佳字幕（手动字幕 > 自动字幕）
-- 支持多语言（中英日韩等主流语言）
-- 可选的语音识别转录（无字幕时）
-- 输出格式化的 Markdown 文档
+- A reusable `video-speech-extractor` skill
+- A CLI-first subtitle extraction script
+- A subtitle-to-text cleaner for `.vtt`, `.srt`, `.ass`, and `.ssa`
+- A YouTube auth fallback that tells users to retry with browser cookies
 
-## 安装
+## Dependencies
 
-### 依赖
+Required:
 
 ```bash
-# 使用 Homebrew 安装（推荐）
 brew install yt-dlp
-
-# 或使用 pip
-pip install yt-dlp
 ```
 
-### 可选依赖
+Optional for skill development and validation:
 
 ```bash
-# 音频提取（无字幕时需要）
-brew install ffmpeg
-
-# 语音识别（无字幕时需要）
-pip install openai-whisper
+python3 -m venv /tmp/video-speech-extractor-skill-venv
+/tmp/video-speech-extractor-skill-venv/bin/pip install pyyaml
 ```
 
-## 使用方法
+## CLI usage
 
-### 作为 Claude Code Skill 使用
-
-将此仓库克隆到 Claude Code skills 目录：
+List available subtitles:
 
 ```bash
-git clone https://github.com/yourusername/video-speech-extractor.git \
-  ~/.claude/skills/video-speech-extractor
+python3 scripts/extract_subtitles.py --list "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
-然后在 Claude Code 中使用触发短语：
-
-- "提取视频字幕"
-- "视频转文字"
-- "get transcript from video"
-
-### 命令行使用
+Retry YouTube with Chrome cookies:
 
 ```bash
-# 查看可用字幕
-python scripts/extract_subtitles.py --list "https://www.youtube.com/watch?v=VIDEO_ID"
-
-# 下载字幕
-python scripts/extract_subtitles.py "https://www.youtube.com/watch?v=VIDEO_ID"
-
-# 指定语言
-python scripts/extract_subtitles.py --language zh-Hans "https://www.youtube.com/watch?v=VIDEO_ID"
-
-# 转换字幕文件为纯文本
-python scripts/subtitle_to_text.py --input subtitle.vtt --output transcript.txt
+python3 scripts/extract_subtitles.py --cookies-from-browser chrome --list "https://www.youtube.com/watch?v=VIDEO_ID"
+python3 scripts/extract_subtitles.py --cookies-from-browser chrome "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
-## 项目结构
+Pin a preferred language:
 
-```
-video-speech-extractor/
-├── SKILL.md                    # Claude Code Skill 定义
-├── README.md                   # 本文档
-├── scripts/
-│   ├── extract_subtitles.py   # 字幕提取工具
-│   └── subtitle_to_text.py    # 字幕格式转换工具
-└── evals/
-    └── evals.json             # 测试用例
+```bash
+python3 scripts/extract_subtitles.py --language en "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
-## 输出格式
+Use an exported cookies file instead of browser cookies:
 
-生成的 Markdown 文件：
-
-```markdown
-# [视频标题]
-
-> 来源：[视频链接]
-> 时长：[视频时长]
-> 提取时间：[日期]
-
-## 讲稿内容
-
-[原语言讲稿内容]
-
----
-
-## 中文翻译
-
-[中文翻译内容，仅外语视频需要]
+```bash
+python3 scripts/extract_subtitles.py --cookies /path/to/cookies.txt "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
-## 错误处理
+Change the output directory:
 
-| 情况 | 处理方式 |
-|------|----------|
-| 视频不可访问 | 提示用户检查链接或网络 |
-| 无字幕可用 | 询问是否需要音频转录 |
-| 字幕语言不匹配 | 下载最接近的语言 |
+```bash
+python3 scripts/extract_subtitles.py --output ./output "https://www.youtube.com/watch?v=VIDEO_ID"
+```
 
-## 许可证
+Convert an existing subtitle file to plain text:
 
-MIT License
+```bash
+python3 scripts/subtitle_to_text.py --input subtitle.vtt --output transcript.txt
+```
+
+## Output files
+
+The extractor writes:
+
+- A raw subtitle file such as `.vtt`, `.srt`, `.ass`, or `.ssa`
+- A Markdown transcript file named `{title}_transcript.md`
+
+Translation is a skill-layer step, not a CLI feature. If the extracted transcript is not Chinese, the skill should automatically create `{title}_transcript_bilingual.md` using the current Codex model, with each original paragraph followed by its Chinese translation.
+
+## YouTube behavior
+
+For some YouTube videos, anonymous `yt-dlp` requests fail with:
+
+`Sign in to confirm you’re not a bot`
+
+That is expected. The supported recovery path is:
+
+1. Retry with `--cookies-from-browser chrome`
+2. If needed, retry with `--cookies /path/to/cookies.txt`
+
+The script detects this case and prints the next suggested command instead of showing a Python traceback.
